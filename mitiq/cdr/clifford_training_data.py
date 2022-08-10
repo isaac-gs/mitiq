@@ -66,9 +66,9 @@ def generate_training_circuits(
         random_state: Seed for sampling.
         kwargs: Available keyword arguments are:
             - sigma_select (float): Width of the Gaussian distribution used for
-            ``method_select='gaussian'``.
+                ``method_select='gaussian'``.
             - sigma_replace (float): Width of the Gaussian distribution used
-            for ``method_replace='gaussian'``.
+                for ``method_replace='gaussian'``.
 
     """
     if random_state is None or isinstance(random_state, int):
