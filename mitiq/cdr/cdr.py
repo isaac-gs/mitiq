@@ -28,7 +28,7 @@ from mitiq.cdr import (
     is_clifford,
 )
 from mitiq.zne.scaling import fold_gates_at_random
-
+from mitiq.cdr.random_circuit_generator import RandomCircuitGenerator
 
 def execute_with_cdr(
     circuit: QPROGRAM,
@@ -101,15 +101,17 @@ def execute_with_cdr(
             for ``method_replace='gaussian'``.
             - random_state (int): Seed for sampling.
     """
-    # Handle keyword arguments for generating training circuits.
+    # Setup generator for training circuits.
+    random_circuit_generator = RandomCircuitGenerator(
+        fraction_non_clifford,
+        kwargs.get("method_select", "uniform"),
+        kwargs.get("method_replace", "closest"),
+        kwargs.get("random_state", None))
 
-    method_select = kwargs.get("method_select", "uniform")
-    method_replace = kwargs.get("method_replace", "closest")
-    random_state = kwargs.get("random_state", None)
-    kwargs_for_training_set_generation = {
-        "sigma_select": kwargs.get("sigma_select"),
-        "sigma_replace": kwargs.get("sigma_replace"),
-    }
+    if "sigma_select" in kwargs:
+        random_circuit_generator.configure_gaussian(
+            kwargs.get("sigma_select"),
+            kwargs.get("sigma_replace"))
 
     if num_fit_parameters is None:
         if fit_function is linear_fit_function:
@@ -132,16 +134,10 @@ def execute_with_cdr(
     if is_clifford(circuit):
         return simulator.evaluate(circuit, observable)[0].real
 
-    # Generate training circuits.
-    training_circuits = generate_training_circuits(
+    # Generate training circuits
+    training_circuits = random_circuit_generator.generate_circuits(
         circuit,
-        num_training_circuits,
-        fraction_non_clifford,
-        method_select,
-        method_replace,
-        random_state,
-        kwargs=kwargs_for_training_set_generation,
-    )
+        num_training_circuits)
 
     # [Optionally] Scale noise in circuits.
     all_circuits = [

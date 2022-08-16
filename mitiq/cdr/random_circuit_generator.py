@@ -34,6 +34,10 @@ from mitiq.cdr.clifford_utils import (
     probabilistic_angle_to_clifford,
 )
 
+from mitiq.interface import ( 
+    atomic_one_to_many_converter,
+)
+
 _GAUSSIAN = 'gaussian'
 _UNIFORM = 'uniform'
 _CLOSEST = 'closest'
@@ -53,6 +57,7 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
         fraction_non_clifford: float,
         method_select: str = _UNIFORM,
         method_replace: str = _CLOSEST,
+        random_state: Optional[Union[int, np.random.RandomState]] = None,
     ) -> None:
         r"""Initializer for random circuit generator.
 
@@ -69,9 +74,62 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
         self._fraction_non_clifford: float = fraction_non_clifford
         self._method_select: str = method_select
         self._method_replace: str = method_replace
-        self._random_state: Optional[Union[int, np.random.RandomState]] = None
+        self._random_state: Optional[Union[int, np.random.RandomState]] = random_state
         self._sigma_select: Optional[float] = None
         self._sigma_replace: Optional[float] = None
+
+    def _swap_operations(
+        self,
+        ops: Sequence[cirq.ops.Operation],
+    ) -> Sequence[cirq.ops.Operation]:
+        """Calls the executor function on noise-scaled quantum circuit and
+        stores the results.
+        """
+        """Function that takes the non-Clifford angles and replacement and
+        selection specifications, returning the projected angles according to a
+        specific method.
+
+        Args:
+            non_clifford_ops: array of non-Clifford angles.
+        Returns:
+            rz_non_clifford_replaced: the selected non-Clifford gates replaced by a
+                                Clifford according to some method.
+
+        Raises:
+            Exception: If argument 'method_replace' is not either 'closest',
+            'uniform' or 'gaussian'.
+        """
+        # TODO: Update these functions to act on operations instead of angles.
+        non_clifford_angles = np.array(
+            [op.gate.exponent * np.pi for op in non_clifford_ops]  # type: ignore
+        )
+        if self._method_replace == _CLOSEST:
+            clifford_angles = closest_clifford(non_clifford_angles)
+
+        elif self._method_replace == _UNIFORM:
+            clifford_angles = random_clifford(
+                len(non_clifford_angles)
+            )
+
+        elif self._method_replace == _GAUSSIAN:
+            clifford_angles = probabilistic_angle_to_clifford(
+                non_clifford_angles, self._sigma_replace
+            )
+
+        else:
+            raise ValueError(
+                f"Arg `method_replace` must be 'closest', 'uniform', or 'gaussian'"
+                f" but was {self._method_replace}."
+            )
+
+        # TODO: Write function to replace the angles in a list of operations?
+        return [
+            cirq.ops.rz(a).on(*q)
+            for (a, q) in zip(
+                clifford_angles,
+                [op.qubits for op in non_clifford_ops],
+            )
+        ]
 
     def configure_gaussian(self, sigma_select: float, sigma_replace: float) -> None:
         if self._method_select != _GAUSSIAN:
@@ -83,24 +141,7 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
         self._sigma_select = sigma_select
         self._sigma_replace = sigma_replace
 
-    def _swap_operation(
-        self,
-        op: cirq.ops.Operation,
-    ) -> cirq.ops.Operation:
-        """Calls the executor function on noise-scaled quantum circuit and
-        stores the results.
-        """
-        raise NotImplementedError
-
-    def _generate_circuit(
-        self,
-        base: Circuit,
-    ) -> Circuit:
-        """Calls the executor function on noise-scaled quantum circuit and
-        stores the results.
-        """
-        raise NotImplementedError
-
+    @atomic_one_to_many_converter
     def generate_circuits(
         self,
         base: Circuit,
@@ -155,9 +196,9 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
         Args:
             non_clifford_ops: A sequence of non-Clifford operations.
         """
-        if self._method_select == _GAUSSIAN:
-            sigma_select: float = self._sigma_select
-            sigma_replace: float = self._sigma_replace
+        if self._method_select != _GAUSSIAN:
+            self._sigma_select = 0.5
+            self._sigma_replace = 0.5
 
         # Select (indices of) operations to replace.
         indices_of_selected_ops = self._select(
@@ -165,7 +206,7 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
         )
 
         # Replace selected operations.
-        clifford_ops: Sequence[cirq.ops.Operation] = self._replace(
+        clifford_ops: Sequence[cirq.ops.Operation] = self._swap_operations(
             [non_clifford_ops[i] for i in indices_of_selected_ops]
         )
 
@@ -216,53 +257,4 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
             p=distribution,
         )
         return [int(i) for i in sorted(selected_indices)]
-
-    def _replace(
-        self,
-        non_clifford_ops: Sequence[cirq.ops.Operation]
-    ) -> Sequence[cirq.ops.Operation]:
-        """Function that takes the non-Clifford angles and replacement and
-        selection specifications, returning the projected angles according to a
-        specific method.
-
-        Args:
-            non_clifford_ops: array of non-Clifford angles.
-        Returns:
-            rz_non_clifford_replaced: the selected non-Clifford gates replaced by a
-                                Clifford according to some method.
-
-        Raises:
-            Exception: If argument 'method_replace' is not either 'closest',
-            'uniform' or 'gaussian'.
-        """
-        # TODO: Update these functions to act on operations instead of angles.
-        non_clifford_angles = np.array(
-            [op.gate.exponent * np.pi for op in non_clifford_ops]  # type: ignore
-        )
-        if self._method_replace == _CLOSEST:
-            clifford_angles = closest_clifford(non_clifford_angles)
-
-        elif self._method_replace == _UNIFORM:
-            clifford_angles = random_clifford(
-                len(non_clifford_angles)
-            )
-
-        elif self._method_replace == _GAUSSIAN:
-            clifford_angles = probabilistic_angle_to_clifford(
-                non_clifford_angles, self._sigma_replace
-            )
-
-        else:
-            raise ValueError(
-                f"Arg `method_replace` must be 'closest', 'uniform', or 'gaussian'"
-                f" but was {self._method_replace}."
-            )
-
-        # TODO: Write function to replace the angles in a list of operations?
-        return [
-            cirq.ops.rz(a).on(*q)
-            for (a, q) in zip(
-                clifford_angles,
-                [op.qubits for op in non_clifford_ops],
-            )
-        ]
+ 

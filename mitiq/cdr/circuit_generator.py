@@ -56,21 +56,11 @@ class AbstractCircuitGenerator(ABC):
         return
 
     @abstractmethod
-    def _swap_operation(
+    def _swap_operations(
         self,
         op: cirq.ops.Operation,
         **kwargs: Any,
     ) -> cirq.ops.Operation:
-        """Calls the executor function on noise-scaled quantum circuit and
-        stores the results.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def _generate_circuit(
-        self,
-        base: Circuit,
-    ) -> Circuit:
         """Calls the executor function on noise-scaled quantum circuit and
         stores the results.
         """
