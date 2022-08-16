@@ -24,7 +24,8 @@ from typing import (
 )
 
 import numpy as np
-from cirq import Circuit
+import cirq
+from cirq.circuits import Circuit
 
 from mitiq.cdr.circuit_generator import AbstractCircuitGenerator
 from mitiq.cdr.clifford_utils import (
@@ -43,7 +44,7 @@ _UNIFORM = 'uniform'
 _CLOSEST = 'closest'
 
 
-class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
+class RandomCircuitGenerator(AbstractCircuitGenerator):
     """Abstract base class that specifies an interface for generating new circuits
     based on a starting circuit. This includes:
 
@@ -71,6 +72,7 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
                 'closest'.
 
         """
+        super(RandomCircuitGenerator, self).__init__()
         self._fraction_non_clifford: float = fraction_non_clifford
         self._method_select: str = method_select
         self._method_replace: str = method_replace
@@ -127,7 +129,7 @@ class RandomCircuitGenerator(metaclass=AbstractCircuitGenerator):
             cirq.ops.rz(a).on(*q)
             for (a, q) in zip(
                 clifford_angles,
-                [op.qubits for op in non_clifford_ops],
+                [op.qubits for op in ops],
             )
         ]
 

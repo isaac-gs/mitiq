@@ -29,12 +29,18 @@ from typing import (
 )
 import warnings
 
+from mitiq.interface import ( 
+    atomic_one_to_many_converter,
+)
+
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.lib.polynomial import RankWarning
 from scipy.optimize import curve_fit, OptimizeWarning
-from cirq import Circuit
+
+import cirq
+from cirq.circuits import Circuit
 
 from mitiq._typing import QPROGRAM, QuantumResult
 from mitiq.observable import Observable
@@ -59,7 +65,6 @@ class AbstractCircuitGenerator(ABC):
     def _swap_operations(
         self,
         op: cirq.ops.Operation,
-        **kwargs: Any,
     ) -> cirq.ops.Operation:
         """Calls the executor function on noise-scaled quantum circuit and
         stores the results.
@@ -67,6 +72,7 @@ class AbstractCircuitGenerator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    @atomic_one_to_many_converter
     def generate_circuits(
         self,
         scale_factor_to_expectation_value: Callable[..., float],
