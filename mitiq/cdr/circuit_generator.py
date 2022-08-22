@@ -30,7 +30,7 @@ from typing import (
 import warnings
 
 from mitiq.interface import ( 
-    atomic_one_to_many_converter,
+    class_atomic_one_to_many_converter,
 )
 
 from matplotlib.figure import Figure
@@ -72,10 +72,11 @@ class AbstractCircuitGenerator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    @atomic_one_to_many_converter
+    @class_atomic_one_to_many_converter
     def generate_circuits(
         self,
-        scale_factor_to_expectation_value: Callable[..., float],
+        circuit: Circuit,
+        num_circuit_to_generate: int,
     ) -> List[Circuit]:
         """Calls the function scale_factor_to_expectation_value at each scale
         factor of the factory, and stores the results.

@@ -36,7 +36,7 @@ from mitiq.cdr.clifford_utils import (
 )
 
 from mitiq.interface import ( 
-    atomic_one_to_many_converter,
+    class_atomic_one_to_many_converter,
 )
 
 _GAUSSIAN = 'gaussian'
@@ -92,7 +92,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         specific method.
 
         Args:
-            non_clifford_ops: array of non-Clifford angles.
+            ops: array of non-Clifford angles.
         Returns:
             rz_non_clifford_replaced: the selected non-Clifford gates replaced by a
                                 Clifford according to some method.
@@ -103,7 +103,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         """
         # TODO: Update these functions to act on operations instead of angles.
         non_clifford_angles = np.array(
-            [op.gate.exponent * np.pi for op in non_clifford_ops]  # type: ignore
+            [op.gate.exponent * np.pi for op in ops]  # type: ignore
         )
         if self._method_replace == _CLOSEST:
             clifford_angles = closest_clifford(non_clifford_angles)
@@ -115,7 +115,9 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
 
         elif self._method_replace == _GAUSSIAN:
             clifford_angles = probabilistic_angle_to_clifford(
-                non_clifford_angles, self._sigma_replace
+                non_clifford_angles,
+                self._sigma_replace,
+                self._random_state
             )
 
         else:
@@ -143,10 +145,10 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         self._sigma_select = sigma_select
         self._sigma_replace = sigma_replace
 
-    @atomic_one_to_many_converter
+    @class_atomic_one_to_many_converter
     def generate_circuits(
         self,
-        base: Circuit,
+        circuit: Circuit,
         num_circuit_to_generate: int,
     ) -> List[Circuit]:
         """Calls the function scale_factor_to_expectation_value at each scale
@@ -162,7 +164,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
             self._random_state = np.random.RandomState(self._random_state)
 
         # Find the non-Clifford operations in the circuit.
-        operations = np.array(list(base.all_operations()))
+        operations = np.array(list(circuit.all_operations()))
         non_clifford_indices_and_ops = np.array(
             [
                 [i, op]
@@ -172,7 +174,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         )
 
         if len(non_clifford_indices_and_ops) == 0:
-            return [base] * num_circuit_to_generate
+            return [circuit] * num_circuit_to_generate
 
         non_clifford_indices = np.int32(non_clifford_indices_and_ops[:, 0])
         non_clifford_ops = non_clifford_indices_and_ops[:, 1]
