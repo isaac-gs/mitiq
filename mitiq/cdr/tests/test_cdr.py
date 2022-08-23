@@ -33,6 +33,9 @@ from mitiq.cdr import (
     cdr_decorator,
 )
 
+from mitiq.cdr.random_circuit_generator import RandomCircuitGenerator
+from mitiq.cdr.mcmc_circuit_generator import MCMCCircuitGenerator
+
 from mitiq.interface import convert_from_mitiq, convert_to_mitiq
 
 from mitiq.cdr._testing import random_x_z_cnot_circuit
@@ -56,6 +59,9 @@ def simulate(circuit: QPROGRAM) -> np.ndarray:
 
 @pytest.mark.parametrize("circuit_type", SUPPORTED_PROGRAM_TYPES.keys())
 @pytest.mark.parametrize(
+    "circuit_generation_method", [RandomCircuitGenerator, MCMCCircuitGenerator]
+)
+@pytest.mark.parametrize(
     "fit_function", [linear_fit_function, linear_fit_function_no_intercept]
 )
 @pytest.mark.parametrize(
@@ -71,7 +77,9 @@ def simulate(circuit: QPROGRAM) -> np.ndarray:
     ],
 )
 @pytest.mark.parametrize("random_state", [1, 2, 3, 4, 5])
-def test_execute_with_cdr(circuit_type, fit_function, kwargs, random_state):
+def test_execute_with_cdr(
+    circuit_type, circuit_generation_method, fit_function, kwargs, random_state
+):
     circuit = random_x_z_cnot_circuit(
         LineQubit.range(2),
         n_moments=5,
@@ -88,6 +96,7 @@ def test_execute_with_cdr(circuit_type, fit_function, kwargs, random_state):
         execute,
         obs,
         simulator=simulate,
+        circuit_generation_method=circuit_generation_method,
         num_training_circuits=20,
         fraction_non_clifford=0.5,
         fit_function=fit_function,
@@ -95,6 +104,68 @@ def test_execute_with_cdr(circuit_type, fit_function, kwargs, random_state):
         **kwargs,
     )
     assert abs(cdr_value - true_value) <= abs(noisy_value - true_value)
+
+
+@pytest.mark.parametrize("circuit_type", SUPPORTED_PROGRAM_TYPES.keys())
+@pytest.mark.parametrize(
+    "fit_function", [linear_fit_function, linear_fit_function_no_intercept]
+)
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {
+            "method_select": "gaussian",
+            "method_replace": "gaussian",
+            "sigma_select": 0.5,
+            "sigma_replace": 0.5,
+        },
+    ],
+)
+@pytest.mark.parametrize("random_state", [1, 2, 3, 4, 5])
+def test_mcmc_cdr_outperforms_random_cdr(
+    circuit_type, fit_function, kwargs, random_state
+):
+    circuit = random_x_z_cnot_circuit(
+        LineQubit.range(2),
+        n_moments=5,
+        random_state=random_state,
+    )
+    circuit = convert_from_mitiq(circuit, circuit_type)
+    obs = Observable(PauliString("XZ"), PauliString("YY"))
+
+    true_value = obs.expectation(circuit, simulate)
+
+    random_cdr_value = execute_with_cdr(
+        circuit,
+        execute,
+        obs,
+        simulator=simulate,
+        circuit_generation_method=RandomCircuitGenerator,
+        num_training_circuits=20,
+        fraction_non_clifford=0.5,
+        fit_function=fit_function,
+        random_state=random_state,
+        **kwargs,
+    )
+
+    mcmc_cdr_value = execute_with_cdr(
+        circuit,
+        execute,
+        obs,
+        simulator=simulate,
+        circuit_generation_method=MCMCCircuitGenerator,
+        num_training_circuits=20,
+        fraction_non_clifford=0.5,
+        fit_function=fit_function,
+        random_state=random_state,
+        **kwargs,
+    )
+
+    mcmc_error = abs(mcmc_cdr_value - true_value)
+    random_error = abs(random_cdr_value - true_value)
+
+    assert mcmc_error <= random_error
 
 
 @pytest.mark.parametrize("circuit_type", SUPPORTED_PROGRAM_TYPES.keys())
@@ -223,7 +294,12 @@ def test_mitigated_execute_with_cdr(
 
 
 @pytest.mark.parametrize("circuit_type", SUPPORTED_PROGRAM_TYPES.keys())
-def test_execute_with_variable_noise_cdr(circuit_type):
+@pytest.mark.parametrize(
+    "circuit_generation_method", [RandomCircuitGenerator, MCMCCircuitGenerator]
+)
+def test_execute_with_variable_noise_cdr(
+    circuit_type, circuit_generation_method
+):
     circuit = random_x_z_cnot_circuit(
         LineQubit.range(2), n_moments=5, random_state=1
     )
@@ -237,6 +313,7 @@ def test_execute_with_variable_noise_cdr(circuit_type):
         execute,
         obs,
         simulator=simulate,
+        circuit_generation_method=circuit_generation_method,
         num_training_circuits=10,
         fraction_non_clifford=0.5,
         scale_factors=[1, 3],
@@ -268,7 +345,12 @@ def test_mitigate_executor_with_variable_noise_cdr(circuit_type):
     assert abs(mitigated - true_value) <= abs(noisy_value - true_value)
 
 
-def test_no_num_fit_parameters_with_custom_fit_raises_error():
+@pytest.mark.parametrize(
+    "circuit_generation_method", [RandomCircuitGenerator, MCMCCircuitGenerator]
+)
+def test_no_num_fit_parameters_with_custom_fit_raises_error(
+    circuit_generation_method,
+):
     with pytest.raises(ValueError, match="Must provide `num_fit_parameters`"):
         execute_with_cdr(
             random_x_z_cnot_circuit(
@@ -277,6 +359,7 @@ def test_no_num_fit_parameters_with_custom_fit_raises_error():
             execute,
             observables=Observable(PauliString()),
             simulator=simulate,
+            circuit_generation_method=circuit_generation_method,
             fit_function=lambda _: 1,
         )
 
@@ -299,7 +382,10 @@ def test_no_num_fit_parameters_mitigate_executor_raises_error():
         mitigated
 
 
-def test_execute_with_cdr_using_clifford_circuit():
+@pytest.mark.parametrize(
+    "circuit_generation_method", [RandomCircuitGenerator, MCMCCircuitGenerator]
+)
+def test_execute_with_cdr_using_clifford_circuit(circuit_generation_method):
     a, b = cirq.LineQubit.range(2)
     clifCirc = cirq.Circuit(
         cirq.H.on(a),
@@ -307,7 +393,11 @@ def test_execute_with_cdr_using_clifford_circuit():
     )
     obs = Observable(PauliString("XZ"), PauliString("YY"))
     cdr_value = execute_with_cdr(
-        clifCirc, observable=obs, executor=execute, simulator=simulate
+        clifCirc,
+        observable=obs,
+        executor=execute,
+        simulator=simulate,
+        circuit_generation_method=circuit_generation_method,
     )
     assert obs.expectation(clifCirc, simulate) == cdr_value
 

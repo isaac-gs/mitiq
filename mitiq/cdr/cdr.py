@@ -22,13 +22,14 @@ from scipy.optimize import curve_fit
 
 from mitiq import Executor, Observable, QPROGRAM, QuantumResult
 from mitiq.cdr import (
-    generate_training_circuits,
     linear_fit_function,
     linear_fit_function_no_intercept,
     is_clifford,
 )
 from mitiq.zne.scaling import fold_gates_at_random
 from mitiq.cdr.random_circuit_generator import RandomCircuitGenerator
+from mitiq.cdr.mcmc_circuit_generator import MCMCCircuitGenerator
+
 
 def execute_with_cdr(
     circuit: QPROGRAM,
@@ -36,6 +37,7 @@ def execute_with_cdr(
     observable: Optional[Observable] = None,
     *,
     simulator: Union[Executor, Callable[[QPROGRAM], QuantumResult]],
+    circuit_generator_type: type = RandomCircuitGenerator,
     num_training_circuits: int = 10,
     fraction_non_clifford: float = 0.1,
     fit_function: Callable[..., float] = linear_fit_function,
@@ -101,17 +103,6 @@ def execute_with_cdr(
             for ``method_replace='gaussian'``.
             - random_state (int): Seed for sampling.
     """
-    # Setup generator for training circuits.
-    random_circuit_generator = RandomCircuitGenerator(
-        fraction_non_clifford,
-        kwargs.get("method_select", "uniform"),
-        kwargs.get("method_replace", "closest"),
-        kwargs.get("random_state", None))
-
-    if "sigma_select" in kwargs:
-        random_circuit_generator.configure_gaussian(
-            kwargs.get("sigma_select"),
-            kwargs.get("sigma_replace"))
 
     if num_fit_parameters is None:
         if fit_function is linear_fit_function:
@@ -127,6 +118,31 @@ def execute_with_cdr(
     if not isinstance(executor, Executor):
         executor = Executor(executor)
 
+    # Setup generator for training circuits.
+    if circuit_generator_type is RandomCircuitGenerator:
+        circuit_generator = RandomCircuitGenerator(
+            fraction_non_clifford,
+            kwargs.get("method_select", "uniform"),
+            kwargs.get("method_replace", "closest"),
+            kwargs.get("random_state", None),
+        )
+    elif circuit_generator_type is MCMCCircuitGenerator:
+        circuit_generator = MCMCCircuitGenerator(
+            fraction_non_clifford,
+            executor,
+            observable,
+            kwargs.get("method_select", "uniform"),
+            kwargs.get("method_replace", "closest"),
+            kwargs.get("random_state", None),
+        )
+    else:
+        raise TypeError("Must provide a valid circuit generation method.")
+
+    if "sigma_select" in kwargs:
+        circuit_generator.configure_gaussian(
+            kwargs.get("sigma_select"), kwargs.get("sigma_replace")
+        )
+
     if not isinstance(simulator, Executor):
         simulator = Executor(simulator)
 
@@ -135,9 +151,8 @@ def execute_with_cdr(
         return simulator.evaluate(circuit, observable)[0].real
 
     # Generate training circuits
-    training_circuits = random_circuit_generator.generate_circuits(
-        circuit=circuit,
-        num_circuit_to_generate=num_training_circuits
+    training_circuits = circuit_generator.generate_circuits(
+        circuit=circuit, num_circuit_to_generate=num_training_circuits
     )
 
     # [Optionally] Scale noise in circuits.

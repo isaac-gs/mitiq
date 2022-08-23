@@ -14,7 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """Functions for mapping circuits to (near) Clifford circuits."""
-from typing import List, Any
+from typing import List
 
 import numpy as np
 
