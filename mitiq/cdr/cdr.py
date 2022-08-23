@@ -37,7 +37,7 @@ def execute_with_cdr(
     observable: Optional[Observable] = None,
     *,
     simulator: Union[Executor, Callable[[QPROGRAM], QuantumResult]],
-    circuit_generator_type: type = RandomCircuitGenerator,
+    circuit_generation_method: type = RandomCircuitGenerator,
     num_training_circuits: int = 10,
     fraction_non_clifford: float = 0.1,
     fit_function: Callable[..., float] = linear_fit_function,
@@ -119,21 +119,21 @@ def execute_with_cdr(
         executor = Executor(executor)
 
     # Setup generator for training circuits.
-    if circuit_generator_type is RandomCircuitGenerator:
+    if circuit_generation_method is RandomCircuitGenerator:
         circuit_generator = RandomCircuitGenerator(
             fraction_non_clifford,
             kwargs.get("method_select", "uniform"),
             kwargs.get("method_replace", "closest"),
             kwargs.get("random_state", None),
         )
-    elif circuit_generator_type is MCMCCircuitGenerator:
+    elif circuit_generation_method is MCMCCircuitGenerator:
         circuit_generator = MCMCCircuitGenerator(
             fraction_non_clifford,
             executor,
             observable,
-            kwargs.get("method_select", "uniform"),
-            kwargs.get("method_replace", "closest"),
-            kwargs.get("random_state", None),
+            method_select=kwargs.get("method_select", "uniform"),
+            method_replace=kwargs.get("method_replace", "closest"),
+            random_state=kwargs.get("random_state", None),
         )
     else:
         raise TypeError("Must provide a valid circuit generation method.")

@@ -90,13 +90,13 @@ class MCMCCircuitGenerator(RandomCircuitGenerator):
         return constants * exponentiation
 
     @class_atomic_one_to_many_converter
-    def generate_circuits(self, circuit, num_circuits_to_generate):
+    def generate_circuits(self, circuit, num_circuit_to_generate):
         """Generates circuits using the MCMC sampling method.
 
         Args:
             circuit: The starting circuit which is mutated to generate
                 new circuits.
-            num_circuits_to_generate: The number of circuits to generate.
+            num_circuit_to_generate: The number of circuits to generate.
         """
         if self._random_state is None or isinstance(self._random_state, int):
             self._random_state = np.random.RandomState(self._random_state)
@@ -112,7 +112,7 @@ class MCMCCircuitGenerator(RandomCircuitGenerator):
         )
 
         if len(non_clifford_indices_and_ops) == 0:
-            return [circuit] * num_circuits_to_generate
+            return [circuit] * num_circuit_to_generate
 
         non_clifford_indices = np.int32(non_clifford_indices_and_ops[:, 0])
         non_clifford_ops = non_clifford_indices_and_ops[:, 1]
@@ -124,7 +124,7 @@ class MCMCCircuitGenerator(RandomCircuitGenerator):
         )
         last_expectation_value = mean_expectation_value
 
-        while len(near_clifford_circuits) < num_circuits_to_generate:
+        while len(near_clifford_circuits) < num_circuit_to_generate:
             new_ops = self._map_to_near_clifford(
                 non_clifford_ops,
             )
