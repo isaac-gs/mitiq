@@ -80,8 +80,6 @@ def convert_to_mitiq(circuit: QPROGRAM) -> Tuple[Circuit, str]:
             return circ
 
     else:
-        print(circuit)
-        print(type(circuit))
         raise UnsupportedCircuitError(
             f"Circuit from module {package} is not supported.\n\n"
             f"Circuit types supported by Mitiq are \n{SUPPORTED_PROGRAM_TYPES}"
