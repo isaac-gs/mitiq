@@ -15,38 +15,14 @@
 
 """Classes corresponding to different zero-noise extrapolation methods."""
 from abc import ABC, abstractmethod
-from copy import deepcopy
-from typing import (
-    Any,
-    Callable,
-    cast,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
-import warnings
+from typing import List
 
-from mitiq.interface import ( 
+from mitiq.interface import (
     class_atomic_one_to_many_converter,
 )
 
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
-import numpy as np
-from numpy.lib.polynomial import RankWarning
-from scipy.optimize import curve_fit, OptimizeWarning
-
 import cirq
 from cirq.circuits import Circuit
-
-from mitiq._typing import QPROGRAM, QuantumResult
-from mitiq.observable import Observable
-from mitiq.executor import Executor
-from mitiq.zne.scaling import fold_gates_at_random
-from mitiq.interface import accept_any_qprogram_as_input
 
 
 class AbstractCircuitGenerator(ABC):

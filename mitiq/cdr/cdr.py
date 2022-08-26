@@ -22,13 +22,13 @@ from scipy.optimize import curve_fit
 
 from mitiq import Executor, Observable, QPROGRAM, QuantumResult
 from mitiq.cdr import (
-    generate_training_circuits,
     linear_fit_function,
     linear_fit_function_no_intercept,
     is_clifford,
 )
 from mitiq.zne.scaling import fold_gates_at_random
 from mitiq.cdr.random_circuit_generator import RandomCircuitGenerator
+
 
 def execute_with_cdr(
     circuit: QPROGRAM,
@@ -106,12 +106,13 @@ def execute_with_cdr(
         fraction_non_clifford,
         kwargs.get("method_select", "uniform"),
         kwargs.get("method_replace", "closest"),
-        kwargs.get("random_state", None))
+        kwargs.get("random_state", None),
+    )
 
     if "sigma_select" in kwargs:
         random_circuit_generator.configure_gaussian(
-            kwargs.get("sigma_select"),
-            kwargs.get("sigma_replace"))
+            kwargs.get("sigma_select"), kwargs.get("sigma_replace")
+        )
 
     if num_fit_parameters is None:
         if fit_function is linear_fit_function:
@@ -136,8 +137,7 @@ def execute_with_cdr(
 
     # Generate training circuits
     training_circuits = random_circuit_generator.generate_circuits(
-        circuit=circuit,
-        num_circuit_to_generate=num_training_circuits
+        circuit=circuit, num_circuit_to_generate=num_training_circuits
     )
 
     # [Optionally] Scale noise in circuits.

@@ -15,7 +15,6 @@
 
 """Classes corresponding to different zero-noise extrapolation methods."""
 from typing import (
-    Any,
     cast,
     List,
     Optional,
@@ -35,13 +34,13 @@ from mitiq.cdr.clifford_utils import (
     probabilistic_angle_to_clifford,
 )
 
-from mitiq.interface import ( 
+from mitiq.interface import (
     class_atomic_one_to_many_converter,
 )
 
-_GAUSSIAN = 'gaussian'
-_UNIFORM = 'uniform'
-_CLOSEST = 'closest'
+_GAUSSIAN = "gaussian"
+_UNIFORM = "uniform"
+_CLOSEST = "closest"
 
 
 class RandomCircuitGenerator(AbstractCircuitGenerator):
@@ -54,7 +53,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
     """
 
     def __init__(
-        self, 
+        self,
         fraction_non_clifford: float,
         method_select: str = _UNIFORM,
         method_replace: str = _CLOSEST,
@@ -65,18 +64,21 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         Args:
             fraction_non_clifford: The (approximate) fraction of non-Clifford
                 gates in each returned circuit.
-            method_select: Method by which non-Clifford gates are selected to be
-                replaced by Clifford gates. Options are 'uniform' or 'gaussian'.
+            method_select: Method by which non-Clifford gates are selected to
+                be replaced by Clifford gates. Options are 'uniform' or
+                'gaussian'.
             method_replace: Method by which selected non-Clifford gates are
-                replaced by Clifford gates. Options are 'uniform', 'gaussian' or
-                'closest'.
+                replaced by Clifford gates. Options are 'uniform', 'gaussian'
+                or 'closest'.
 
         """
         super(RandomCircuitGenerator, self).__init__()
         self._fraction_non_clifford: float = fraction_non_clifford
         self._method_select: str = method_select
         self._method_replace: str = method_replace
-        self._random_state: Optional[Union[int, np.random.RandomState]] = random_state
+        self._random_state: Optional[
+            Union[int, np.random.RandomState]
+        ] = random_state
         self._sigma_select: Optional[float] = None
         self._sigma_replace: Optional[float] = None
 
@@ -94,8 +96,8 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         Args:
             ops: array of non-Clifford angles.
         Returns:
-            rz_non_clifford_replaced: the selected non-Clifford gates replaced by a
-                                Clifford according to some method.
+            rz_non_clifford_replaced: the selected non-Clifford gates replaced
+                by a Clifford according to some method.
 
         Raises:
             Exception: If argument 'method_replace' is not either 'closest',
@@ -109,20 +111,17 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
             clifford_angles = closest_clifford(non_clifford_angles)
 
         elif self._method_replace == _UNIFORM:
-            clifford_angles = random_clifford(
-                len(non_clifford_angles)
-            )
+            clifford_angles = random_clifford(len(non_clifford_angles))
 
         elif self._method_replace == _GAUSSIAN:
             clifford_angles = probabilistic_angle_to_clifford(
-                non_clifford_angles,
-                self._sigma_replace,
-                self._random_state
+                non_clifford_angles, self._sigma_replace, self._random_state
             )
 
         else:
             raise ValueError(
-                f"Arg `method_replace` must be 'closest', 'uniform', or 'gaussian'"
+                f"Arg `method_replace` must be 'closest', \
+                    'uniform', or 'gaussian'"
                 f" but was {self._method_replace}."
             )
 
@@ -135,10 +134,13 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
             )
         ]
 
-    def configure_gaussian(self, sigma_select: float, sigma_replace: float) -> None:
+    def configure_gaussian(
+        self, sigma_select: float, sigma_replace: float
+    ) -> None:
         if self._method_select != _GAUSSIAN:
             raise ValueError(
-                f"Sigma configuration must be used with 'method_select'=='gaussian'"
+                f"Sigma configuration must be used with \
+                    'method_select'=='gaussian'"
                 f" but was {self._method_select}."
             )
 
@@ -205,9 +207,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
             self._sigma_replace = 0.5
 
         # Select (indices of) operations to replace.
-        indices_of_selected_ops = self._select(
-            non_clifford_ops
-        )
+        indices_of_selected_ops = self._select(non_clifford_ops)
 
         # Replace selected operations.
         clifford_ops: Sequence[cirq.ops.Operation] = self._swap_operations(
@@ -223,8 +223,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         ]
 
     def _select(
-        self,
-        non_clifford_ops: Sequence[cirq.ops.Operation]
+        self, non_clifford_ops: Sequence[cirq.ops.Operation]
     ) -> List[int]:
         """Returns indices of non-Clifford operations selected (to be replaced)
         according to some method.
@@ -233,11 +232,15 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
             non_clifford_ops: Sequence of non-Clifford operations.
         """
         num_non_cliff = len(non_clifford_ops)
-        num_to_replace = int(round(self._fraction_non_clifford * num_non_cliff))
+        num_to_replace = int(
+            round(self._fraction_non_clifford * num_non_cliff)
+        )
 
         # Get the distribution for how to select operations.
         if self._method_select == _UNIFORM:
-            distribution = 1.0 / num_non_cliff * np.ones(shape=(num_non_cliff,))
+            distribution = (
+                1.0 / num_non_cliff * np.ones(shape=(num_non_cliff,))
+            )
         elif self._method_select == _GAUSSIAN:
             non_clifford_angles = np.array(
                 [
@@ -245,7 +248,10 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
                     for op in non_clifford_ops
                 ]
             )
-            probabilities = angle_to_proximity(non_clifford_angles, self._sigma_select)
+            probabilities = angle_to_proximity(
+                non_clifford_angles,
+                self._sigma_select,
+            )
             distribution = [k / sum(probabilities) for k in probabilities]
         else:
             raise ValueError(
@@ -254,11 +260,13 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
             )
 
         # Select (indices of) non-Clifford operations to replace.
-        selected_indices = cast(np.random.RandomState, self._random_state).choice(
+        selected_indices = cast(
+            np.random.RandomState,
+            self._random_state,
+        ).choice(
             range(num_non_cliff),
             num_non_cliff - num_to_replace,
             replace=False,
             p=distribution,
         )
         return [int(i) for i in sorted(selected_indices)]
- 
