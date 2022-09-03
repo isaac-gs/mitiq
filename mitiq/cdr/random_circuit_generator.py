@@ -79,8 +79,11 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         self._random_state: Optional[
             Union[int, np.random.RandomState]
         ] = random_state
-        self._sigma_select: Optional[float] = None
-        self._sigma_replace: Optional[float] = None
+        self._sigma_select: float = 0.5
+        self._sigma_replace: float = 0.5
+        
+        if self._random_state is None or isinstance(self._random_state, int):
+            self._random_state = np.random.RandomState(self._random_state)
 
     def _swap_operations(
         self,
@@ -111,7 +114,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
             clifford_angles = closest_clifford(non_clifford_angles)
 
         elif self._method_replace == _UNIFORM:
-            clifford_angles = random_clifford(len(non_clifford_angles))
+            clifford_angles = random_clifford(len(non_clifford_angles), self._random_state)
 
         elif self._method_replace == _GAUSSIAN:
             clifford_angles = probabilistic_angle_to_clifford(
@@ -137,6 +140,7 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
     def configure_gaussian(
         self, sigma_select: float, sigma_replace: float
     ) -> None:
+        """A function required to run in order to use gaussian generation."""
         if self._method_select != _GAUSSIAN:
             raise ValueError(
                 f"Sigma configuration must be used with \
@@ -151,20 +155,22 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
     def generate_circuits(
         self,
         circuit: Circuit,
-        num_circuit_to_generate: int,
+        num_circuits_to_generate: int,
     ) -> List[Circuit]:
-        """Calls the function scale_factor_to_expectation_value at each scale
-        factor of the factory, and stores the results.
+        r"""Returns a list of (near) Clifford circuits obtained by replacing (some)
+        non-Clifford gates in the input circuit by Clifford gates.
+
+        The way in which non-Clifford gates are selected to be replaced is
+        determined by ``method_select`` and ``method_replace``.
+
+        In the Clifford Data Regression (CDR) method
+        :cite:`Czarnik_2021_Quantum`, data generated from these circuits is used
+        as a training set to learn the effect of noise.
 
         Args:
-            scale_factor_to_expectation_value: A function which inputs a scale
-                factor and outputs an expectation value. This does not have to
-                involve a quantum processor making this a "classical analogue"
-                of the run method.
+            circuit: The starting circuit.
+            num_circuits_to_generate: The number of circuits to generate.
         """
-        if self._random_state is None or isinstance(self._random_state, int):
-            self._random_state = np.random.RandomState(self._random_state)
-
         # Find the non-Clifford operations in the circuit.
         operations = np.array(list(circuit.all_operations()))
         non_clifford_indices_and_ops = np.array(
@@ -176,14 +182,14 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         )
 
         if len(non_clifford_indices_and_ops) == 0:
-            return [circuit] * num_circuit_to_generate
+            return [circuit] * num_circuits_to_generate
 
         non_clifford_indices = np.int32(non_clifford_indices_and_ops[:, 0])
         non_clifford_ops = non_clifford_indices_and_ops[:, 1]
 
         # Replace (some of) the non-Clifford operations.
         near_clifford_circuits = []
-        for _ in range(num_circuit_to_generate):
+        for _ in range(num_circuits_to_generate):
             new_ops = self._map_to_near_clifford(
                 non_clifford_ops,
             )
@@ -202,10 +208,6 @@ class RandomCircuitGenerator(AbstractCircuitGenerator):
         Args:
             non_clifford_ops: A sequence of non-Clifford operations.
         """
-        if self._method_select != _GAUSSIAN:
-            self._sigma_select = 0.5
-            self._sigma_replace = 0.5
-
         # Select (indices of) operations to replace.
         indices_of_selected_ops = self._select(non_clifford_ops)
 

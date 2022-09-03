@@ -52,15 +52,20 @@ class AbstractCircuitGenerator(ABC):
     def generate_circuits(
         self,
         circuit: Circuit,
-        num_circuit_to_generate: int,
+        num_circuits_to_generate: int,
     ) -> List[Circuit]:
-        """Calls the function scale_factor_to_expectation_value at each scale
-        factor of the factory, and stores the results.
+        """Returns a list of (near) Clifford circuits obtained by replacing (some)
+        non-Clifford gates in the input circuit by Clifford gates.
+
+        The way in which non-Clifford gates are selected to be replaced is
+        determined by ``method_select`` and ``method_replace``.
+
+        In the Clifford Data Regression (CDR) method
+        :cite:`Czarnik_2021_Quantum`, data generated from these circuits is used
+        as a training set to learn the effect of noise.
 
         Args:
-            scale_factor_to_expectation_value: A function which inputs a scale
-                factor and outputs an expectation value. This does not have to
-                involve a quantum processor making this a "classical analogue"
-                of the run method.
+            circuit: The starting circuit.
+            num_circuits_to_generate: The number of circuits to generate.
         """
         raise NotImplementedError

@@ -137,7 +137,7 @@ def execute_with_cdr(
 
     # Generate training circuits
     training_circuits = random_circuit_generator.generate_circuits(
-        circuit=circuit, num_circuit_to_generate=num_training_circuits
+        circuit=circuit, num_circuits_to_generate=num_training_circuits
     )
 
     # [Optionally] Scale noise in circuits.
